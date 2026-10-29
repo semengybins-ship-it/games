@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NET_BREAKER // TERMINAL</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            background-color: #080c08;
+            color: #00ff66;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 10px;
+            margin: 0;
+            font-size: 14px;
+        }
+        h2 { text-align: center; color: #00ff66; border-bottom: 1px dashed #00ff66; padding-bottom: 5px; font-size: 16px; }
+        .stats-panel {
+            background: #0d140d;
+            border: 1px solid #00ff66;
+            padding: 8px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        .alarm-bar {
+            font-weight: bold;
+        }
+        .high-alarm { color: #ff3333; }
+        .med-alarm { color: #ffbb00; }
+        .low-alarm { color: #00ff66; }
+        
+        .section-title {
+            color: #00bcd4;
+            margin: 8px 0 4px 0;
+            font-size: 13px;
+            border-bottom: 1px solid #00bcd4;
+        }
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+        button {
+            background: #001100;
+            color: #00ff66;
+            border: 1px solid #00ff66;
+            padding: 8px 4px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 3px;
+            text-align: center;
+        }
+        button:active { background: #00ff66; color: #000; }
+        button:disabled { border-color: #333; color: #333; cursor: not-allowed; }
+        
+        .console {
+            background: #000;
+            border: 1px dashed #333;
+            padding: 8px;
+            height: 140px;
+            overflow-y: auto;
+            font-size: 11px;
+            color: #ffb700;
+            margin-bottom: 10px;
+        }
+        .order-card {
+            background: #0e120e;
+            border: 1px solid #00bcd4;
+            padding: 8px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+        }
+        .locked { opacity: 0.4; }
+    </style>
+</head>
+<body>
+    <h2>// NET_BREAKER // v1.0.4</h2>
+
+    <div class="stats-panel" id="statsPanel">
+        Загрузка профиля...
+    </div>
+
+    <!-- МЕНЮ ВЫБОРА ЗАКАЗОВ -->
+    <div id="ordersView" style="display:none;">
+        <div class="section-title">ДАРКНЕТ-БИРЖА КОНТРАКТОВ</div>
+        <div id="ordersList"></div>
+    </div>
+
+    <!-- ИГРОВОЙ ТЕРМИНАЛ -->
+    <div id="gameView" style="display:none;">
+        <div class="section-title" id="currentMissionTitle">ТЕКУЩЕЕ ЗАДАНИЕ</div>
+        
+        <div class="console" id="console"></div>
+
+        <div class="section-title">ИНСТРУМЕНТЫ ВЗЛОМА</div>
+        <div class="btn-grid">
+            <button onclick="sendCmd('nmap')">[1] nmap (Скан)</button>
+            <button onclick="sendCmd('ping')">[2] ping (Пинг)</button>
+            <button onclick="sendCmd('crack', 'brute')">[3] crack --brute</button>
+            <button onclick="sendCmd('crack', 'sql')">[4] crack --sql</button>
+            <button onclick="sendCmd('decode')">[5] decode (Стелс)</button>
+            <button onclick="sendCmd('bypass')">[6] bypass (Файрвол)</button>
+            <button onclick="sendCmd('proxy', 'on')">[7] proxy on</button>
+            <button onclick="sendCmd('proxy', 'off')">[8] proxy off</button>
+            <button onclick="sendCmd('trace_reset')">[9] trace --reset</button>
+            <button onclick="sendCmd('submit')">[!] submit (Сдать)</button>
+        </div>
+
+        <div class="section-title">СПЕЦ-ДЕЙСТВИЯ (ЗАВИСИТ ОТ ЦЕЛИ)</div>
+        <div class="btn-grid">
+            <button onclick="sendCmd('inject', 'acc_8841')">inject acc_8841</button>
+            <button onclick="sendCmd('rm', 'acc_8841')">rm -rf acc_8841</button>
+            <button onclick="sendCmd('inject', 'fake_balance')">inject fake_balance</button>
+            <button onclick="sendCmd('inject', 'intercept')">inject intercept</button>
+            <button onclick="sendCmd('rm', 'logs')">rm -rf logs</button>
+            <button onclick="sendCmd('rm', 'compromising_data')">rm -rf data</button>
+        </div>
+        
+        <button style="width:100%; margin-top:5px; border-color:#ff3333; color:#ff3333;" onclick="location.reload()">[ ВЫЙТИ НА БИРЖУ ]</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        const userId = tg.initDataUnsafe?.user?.id || 'player_test_123';
+        let playerData = null;
+
+        const ORDERS_META = {
+            1: { title: "Заказ #1: Снос аккаунта должника", diff: "Лёгкий", reward: 150 },
+            2: { title: "Заказ #2: Подмена баланса кафе", diff: "Средний", reward: 300 },
+            3: { title: "Заказ #3: Обход файрвола финансов", diff: "Сложный", reward: 600 },
+            4: { title: "Заказ #4: Корпоративный экстрим", diff: "Экстрим", reward: 1200 }
+        };
+
+        function fetchState() {
+            fetch(`/api/player/${userId}`)
+                .then(res => res.json())
+                .then(data => {
+                    playerData = data;
+                    updateUI();
+                });
+        }
+
+        function updateUI() {
+            // Статус-панель
+            let alarmClass = playerData.alarm >= 70 ? 'high-alarm' : (playerData.alarm >= 35 ? 'med-alarm' : 'low-alarm');
+            let barLen = 15;
+            let filled = Math.floor(playerData.alarm / 100 * barLen);
+            let bar = '#'.repeat(filled) + '-'.repeat(barLen - filled);
+
+            document.getElementById('statsPanel').innerHTML = `
+                💰 Баланс: <b>${playerData.credits} cr</b> | Репутация: <b>${playerData.reputation}</b><br>
+                <span class="alarm-bar ${alarmClass}">🔥 Тревога: [${bar}] ${playerData.alarm}%</span>
+            `;
+
+            if (!playerData.current_order) {
+                // Показываем меню биржи
+                document.getElementById('ordersView').style.display = 'block';
+                document.getElementById('gameView').style.display = 'none';
+                renderOrders();
+            } else {
+                // Показываем игровой терминал
+                document.getElementById('ordersView').style.display = 'none';
+                document.getElementById('gameView').style.display = 'block';
+                document.getElementById('console').innerHTML = playerData.logs.join('<br>');
+            }
+        }
+
+        function renderOrders() {
+            let html = '';
+            for (let id in ORDERS_META) {
+                let o = ORDERS_META[id];
+                let unlocked = playerData.unlocked.includes(Number(id));
+                html += `
+                    <div class="order-card ${unlocked ? '' : 'locked'}">
+                        <b>${o.title}</b><br>
+                        Сложность: ${o.diff} | Награда: ${o.reward} cr<br>
+                        ${unlocked ? `<button style="margin-top:5px; width:100%;" onclick="selectOrder(${id})">[ ПРИНЯТЬ ЗАКАЗ ]</button>` : '<span style="color:#ff3333">🔒 Заблокировано (нужна репутация)</span>'}
+                    </div>
+                `;
+            }
+            document.getElementById('ordersList').innerHTML = html;
+        }
+
+        function selectOrder(orderId) {
+            fetch('/api/select_order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, orderId })
+            })
+            .then(res => res.json())
+            .then(data => {
+                playerData = data.player;
+                updateUI();
+                if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+            });
+        }
+
+        function sendCmd(cmd, arg1) {
+            fetch('/api/command', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, cmd, arg1 })
+            })
+            .then(res => res.json())
+            .then(data => {
+                playerData = data.player;
+                updateUI();
+                if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+
+                if (data.status === 'failed') {
+                    alert('🚨 ВНИМАНИЕ: Вас отследили! Соединение разорвано.');
+                } else if (data.status === 'won') {
+                    alert('🎉 Заказ успешно выполнен! Данные зачищены.');
+                }
+            });
+        }
+
+        fetchState();
+    </script>
+</body>
+</html>

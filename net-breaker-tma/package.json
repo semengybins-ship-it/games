@@ -1,0 +1,13 @@
+{
+  "name": "net-breaker-tma",
+  "version": "1.0.4",
+  "description": "Net Breaker Terminal game for Telegram Mini App",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "node-telegram-bot-api": "^0.66.0"
+  }
+}
